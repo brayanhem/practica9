@@ -1,0 +1,40 @@
+# Configuracion del juego (las lineas que empiezan con # se ignoran)
+# TABLERO,columnas,filas
+# INVENTARIO,capacidad
+# NIVEL,nombre,numero,dificultad
+# NAVE,nombre,vida,vidaMaxima,x,y
+# CHECKPOINT,nombre,x,y,activado
+# ASTEROIDE,nombre,dano,x,y,direccion
+# SATELITE,nombre,descripcion,x,y
+# ARMA_MAPA,nombre,dano,alcance,x,y
+# RECOMPENSA_MAPA,nombre,valor,tipo,x,y
+# ARMA_INVENTARIO,nombre,dano,alcance
+# RECOMPENSA_INVENTARIO,nombre,valor,tipo
+TABLERO,15,10
+INVENTARIO,7
+NIVEL,Cinturon de Asteroides,1,Facil
+NAVE,Halcon,100,100,0,4
+CHECKPOINT,Estacion,6,5,false
+ASTEROIDE,Asteroide,20,3,2,ABAJO
+ASTEROIDE,Asteroide,20,3,7,ARRIBA
+ASTEROIDE,Asteroide,20,5,0,ABAJO
+ASTEROIDE,Asteroide,20,5,5,ARRIBA
+ASTEROIDE,Asteroide,20,7,3,ABAJO
+ASTEROIDE,Asteroide,20,7,8,ARRIBA
+ASTEROIDE,Asteroide,20,9,1,ABAJO
+ASTEROIDE,Asteroide,20,9,6,ARRIBA
+ASTEROIDE,Asteroide,20,11,4,ABAJO
+ASTEROIDE,Asteroide,20,11,9,ARRIBA
+ASTEROIDE,Asteroide,20,13,2,ABAJO
+ASTEROIDE,Asteroide,20,13,7,ARRIBA
+SATELITE,Satelite 1,Repara 25 de vida,2,1
+SATELITE,Satelite 2,Repara 25 de vida,12,6
+ARMA_MAPA,Laser,50,5.0,2,5
+RECOMPENSA_MAPA,Cristal,10,Cristal,4,2
+RECOMPENSA_MAPA,Cristal,10,Cristal,6,6
+RECOMPENSA_MAPA,Cristal,10,Cristal,7,5
+RECOMPENSA_MAPA,Cristal,10,Cristal,8,9
+RECOMPENSA_MAPA,Cristal,10,Cristal,9,4
+RECOMPENSA_MAPA,Cristal,10,Cristal,10,2
+RECOMPENSA_MAPA,Cristal,10,Cristal,11,7
+RECOMPENSA_MAPA,Cristal,10,Cristal,12,5

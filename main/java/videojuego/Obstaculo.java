@@ -44,6 +44,11 @@ public class Obstaculo implements Destruible,ElementoDinamico{
         return direccionActual;
     }
 
+    // Se usa al cargar una partida guardada: "ARRIBA" o "ABAJO"
+    public void setDireccionActual(String direccionActual) {
+        this.direccionActual = direccionActual;
+    }
+
     @Override
     public void mover(String direccionIgnorada, int distancia) {
         if (destruido) return;

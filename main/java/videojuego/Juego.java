@@ -22,53 +22,280 @@ public class Juego {
     private int rayoX;
     private int rayoY;
 
+    // Objeto que sabe leer y escribir archivos de texto
+    private GestorArchivo gestorArchivo = new GestorArchivo();
+
+    // Partida nueva con la configuración inicial por defecto (no lee ningún archivo)
     public Juego() {
-        iniciar();
+        cargarConfiguracion(crearConfiguracionPorDefecto());
     }
 
-    private void iniciar() {
-        Inventario inventario = new Inventario(capacidadInventario);
-        nivel = new Nivel("Cinturón de Asteroides", 1, "Fácil", inventario);
-        nave = new Personaje("Halcón", vidaInicial, 0, 4);
-        nave.setTablero(columnas, filas);
+    //Partida que se restaura leyendo el archivo
+    //Si el archivo todavía no existe, se crea con la configuración inicial
+
+    public Juego(String nombreArchivo) {
+        if (gestorArchivo.existeArchivo(nombreArchivo)) {
+            cargarConfiguracion(gestorArchivo.leerConfiguracion(nombreArchivo));
+            mensaje = "Partida cargada desde " + nombreArchivo;
+        } else {
+            List<String> porDefecto = crearConfiguracionPorDefecto();
+            gestorArchivo.escribirConfiguracion(nombreArchivo, porDefecto);
+            cargarConfiguracion(porDefecto);
+            mensaje = "Se creó " + nombreArchivo + " con la configuración inicial.";
+        }
+    }
+
+    //Persistencia: LEER el archivo
+    //Convierte las líneas de texto en objetos y los agrega al nivel
+    private void cargarConfiguracion(List<String> lineas) {
+        // Valores por si el archivo no trae esas líneas
+        columnas = 15;
+        filas = 10;
+        capacidadInventario = 7;
+        String nombreNivel = "Cinturon de Asteroides";
+        int numeroNivel = 1;
+        String dificultad = "Facil";
+
+        // Paso 1: leer los datos generales (tablero, inventario y nivel)
+        for (String linea : lineas) {
+            String[] d = separarLinea(linea);
+            if (d != null) {
+                try {
+                    if (d[0].equals("TABLERO")) {
+                        columnas = Integer.parseInt(d[1]);
+                        filas = Integer.parseInt(d[2]);
+                    } else if (d[0].equals("INVENTARIO")) {
+                        capacidadInventario = Integer.parseInt(d[1]);
+                    } else if (d[0].equals("NIVEL")) {
+                        nombreNivel = d[1];
+                        numeroNivel = Integer.parseInt(d[2]);
+                        dificultad = d[3];
+                    }
+                } catch (Exception e) {
+                    System.out.println("Linea ignorada (formato incorrecto): " + linea);
+                }
+            }
+        }
+
+        // Paso 2: crear el nivel vacío y reiniciar el estado del juego
+        nivel = new Nivel(nombreNivel, numeroNivel, dificultad, new Inventario(capacidadInventario));
         itemsEnMapa = new ArrayList<>();
+        nave = null;
         ultimoCheckPoint = null;
         juegoTerminado = false;
         victoria = false;
         hayRayo = false;
         mensaje = "Usa las flechas para moverte. ¡Los asteroides se mueven solos!";
 
+        // Paso 3: agregar al nivel cada elemento que aparece en el archivo
+        for (String linea : lineas) {
+            String[] d = separarLinea(linea);
+            if (d != null) {
+                try {
+                    agregarElemento(d);
+                } catch (Exception e) {
+                    System.out.println("Linea ignorada (formato incorrecto): " + linea);
+                }
+            }
+        }
+
+        if (nave == null) {
+            System.out.println("El archivo no tiene una linea NAVE: se usa la configuracion por defecto.");
+            cargarConfiguracion(crearConfiguracionPorDefecto());
+            return;
+        }
+        nivel.mostrarEstado();
+    }
+
+    //Separa una línea en sus campos. Regresa null si está vacía o es un comentario (#)
+    private String[] separarLinea(String linea) {
+        linea = linea.trim();
+        if (linea.isEmpty() || linea.startsWith("#")) {
+            return null;
+        }
+        String[] campos = linea.split(",");
+        for (int i = 0; i < campos.length; i++) {
+            campos[i] = campos[i].trim();
+        }
+        return campos;
+    }
+
+    //Crea el objeto que describe una línea (d[0] es el tipo de elemento)
+    private void agregarElemento(String[] d) {
+        String tipo = d[0];
+
+        if (tipo.equals("NAVE")) {
+            // NAVE,nombre,vida,vidaMaxima,x,y
+            nave = new Personaje(d[1], Integer.parseInt(d[3]), Integer.parseInt(d[4]), Integer.parseInt(d[5]));
+            nave.setTablero(columnas, filas);
+            nave.setVida(Integer.parseInt(d[2]));
+
+        } else if (tipo.equals("CHECKPOINT")) {
+            // CHECKPOINT,nombre,x,y,activado
+            CheckPoint checkPoint = new CheckPoint(d[1], Integer.parseInt(d[2]), Integer.parseInt(d[3]));
+            if (d[4].equals("true")) {
+                checkPoint.activar();
+                ultimoCheckPoint = checkPoint;
+            }
+            nivel.agregarCheckPoint(checkPoint);
+
+        } else if (tipo.equals("ASTEROIDE")) {
+            // ASTEROIDE,nombre,daño,x,y,direccion
+            Obstaculo asteroide = new Obstaculo(d[1], Integer.parseInt(d[2]), Integer.parseInt(d[3]), Integer.parseInt(d[4]));
+            asteroide.setFilas(filas);
+            asteroide.setDireccionActual(d[5]);
+            nivel.agregarObstaculo(asteroide);
+            nivel.agregarElementoDinamico(asteroide);
+
+        } else if (tipo.equals("SATELITE")) {
+            // SATELITE,nombre,descripcion,x,y
+            Utileria satelite = new Utileria(d[1], d[2], Integer.parseInt(d[3]), Integer.parseInt(d[4]));
+            satelite.setTablero(columnas, filas);
+            nivel.agregarElementoDinamico(satelite);
+
+        } else if (tipo.equals("ARMA_MAPA")) {
+            // ARMA_MAPA,nombre,daño,alcance,x,y
+            Arma arma = new Arma(d[1], Integer.parseInt(d[2]), Double.parseDouble(d[3]));
+            itemsEnMapa.add(new ItemEnMapa(arma, Integer.parseInt(d[4]), Integer.parseInt(d[5])));
+
+        } else if (tipo.equals("RECOMPENSA_MAPA")) {
+            // RECOMPENSA_MAPA,nombre,valor,tipo,x,y
+            Recompensa recompensa = new Recompensa(d[1], Integer.parseInt(d[2]), d[3]);
+            itemsEnMapa.add(new ItemEnMapa(recompensa, Integer.parseInt(d[4]), Integer.parseInt(d[5])));
+
+        } else if (tipo.equals("ARMA_INVENTARIO")) {
+            // ARMA_INVENTARIO,nombre,daño,alcance
+            nivel.getInventario().agregarItem(new Arma(d[1], Integer.parseInt(d[2]), Double.parseDouble(d[3])));
+
+        } else if (tipo.equals("RECOMPENSA_INVENTARIO")) {
+            // RECOMPENSA_INVENTARIO,nombre,valor,tipo
+            nivel.getInventario().agregarItem(new Recompensa(d[1], Integer.parseInt(d[2]), d[3]));
+        }
+    }
+
+    //Persistencia ESCRIBIR el archivo
+
+    //Guarda el estado actual del juego en el archivo (sobrescribe la configuración anterior)
+    public void guardarPartida(String nombreArchivo) {
+        if (juegoTerminado) {
+            mensaje = "No se puede guardar: la partida ya terminó.";
+            return;
+        }
+
+        List<String> lineas = crearEncabezado();
+        lineas.add("TABLERO," + columnas + "," + filas);
+        lineas.add("INVENTARIO," + nivel.getInventario().getCapacidadMaxima());
+        lineas.add("NIVEL," + nivel.getNombre() + "," + nivel.getNumero() + "," + nivel.getDificultad());
+        lineas.add("NAVE," + nave.getNombre() + "," + nave.getVida() + "," + nave.getVidaMaxima()
+                + "," + nave.getPosicionX() + "," + nave.getPosicionY());
+
+        for (CheckPoint c : nivel.getCheckPoints()) {
+            lineas.add("CHECKPOINT," + c.getNombre() + "," + c.getPosicionX() + "," + c.getPosicionY()
+                    + "," + c.isActivado());
+        }
+
+        // Los asteroides destruidos y los satélites ya usados no se guardan: ya no existen
+        for (Obstaculo o : nivel.getObstaculos()) {
+            if (!o.isDestruido()) {
+                lineas.add("ASTEROIDE," + o.getNombre() + "," + o.getDaño() + "," + o.getPosicionX()
+                        + "," + o.getPosicionY() + "," + o.getDireccionActual());
+            }
+        }
+        for (ElementoDinamico e : nivel.getElementosDinamicos()) {
+            if (e instanceof Utileria) {
+                Utileria u = (Utileria) e;
+                if (!u.isUsada()) {
+                    lineas.add("SATELITE," + u.getNombre() + "," + u.getDescripcion() + ","
+                            + u.getPosicionX() + "," + u.getPosicionY());
+                }
+            }
+        }
+
+        // Objetos que todavía están en el mapa
+        for (ItemEnMapa i : itemsEnMapa) {
+            if (i.getItem() instanceof Arma) {
+                Arma a = (Arma) i.getItem();
+                lineas.add("ARMA_MAPA," + a.getNombre() + "," + a.getDaño() + "," + a.getAlcance()
+                        + "," + i.getPosicionX() + "," + i.getPosicionY());
+            } else if (i.getItem() instanceof Recompensa) {
+                Recompensa r = (Recompensa) i.getItem();
+                lineas.add("RECOMPENSA_MAPA," + r.getNombre() + "," + r.getValor() + "," + r.getTipo()
+                        + "," + i.getPosicionX() + "," + i.getPosicionY());
+            }
+        }
+
+        // Objetos que ya recogiste
+        for (Inventariable item : nivel.getInventario().getItems()) {
+            if (item instanceof Arma) {
+                Arma a = (Arma) item;
+                lineas.add("ARMA_INVENTARIO," + a.getNombre() + "," + a.getDaño() + "," + a.getAlcance());
+            } else if (item instanceof Recompensa) {
+                Recompensa r = (Recompensa) item;
+                lineas.add("RECOMPENSA_INVENTARIO," + r.getNombre() + "," + r.getValor() + "," + r.getTipo());
+            }
+        }
+
+        boolean exito = gestorArchivo.escribirConfiguracion(nombreArchivo, lineas);
+        if (exito) {
+            mensaje = "Partida guardada en " + nombreArchivo;
+        } else {
+            mensaje = "Error: no se pudo guardar la partida.";
+        }
+    }
+
+    //Comentarios que explican el formato; se escriben al inicio del archivo
+    private List<String> crearEncabezado() {
+        List<String> lineas = new ArrayList<>();
+        lineas.add("# Configuracion del juego (las lineas que empiezan con # se ignoran)");
+        lineas.add("# TABLERO,columnas,filas");
+        lineas.add("# INVENTARIO,capacidad");
+        lineas.add("# NIVEL,nombre,numero,dificultad");
+        lineas.add("# NAVE,nombre,vida,vidaMaxima,x,y");
+        lineas.add("# CHECKPOINT,nombre,x,y,activado");
+        lineas.add("# ASTEROIDE,nombre,dano,x,y,direccion");
+        lineas.add("# SATELITE,nombre,descripcion,x,y");
+        lineas.add("# ARMA_MAPA,nombre,dano,alcance,x,y");
+        lineas.add("# RECOMPENSA_MAPA,nombre,valor,tipo,x,y");
+        lineas.add("# ARMA_INVENTARIO,nombre,dano,alcance");
+        lineas.add("# RECOMPENSA_INVENTARIO,nombre,valor,tipo");
+        return lineas;
+    }
+
+    //La configuración con la que empieza una partida nueva (se usa si no hay archivo)
+    private List<String> crearConfiguracionPorDefecto() {
+        List<String> lineas = crearEncabezado();
+        lineas.add("TABLERO," + columnas + "," + filas);
+        lineas.add("INVENTARIO," + capacidadInventario);
+        lineas.add("NIVEL,Cinturon de Asteroides,1,Facil");
+        lineas.add("NAVE,Halcon," + vidaInicial + "," + vidaInicial + ",0,4");
+        lineas.add("CHECKPOINT,Estacion,6,5,false");
+
         // Asteroides
         int[][] asteroides = {
                 {3, 2}, {3, 7}, {5, 0}, {5, 5}, {7, 3}, {7, 8},
                 {9, 1}, {9, 6}, {11, 4}, {11, 9}, {13, 2}, {13, 7}
         };
-        for (int[] pos : asteroides) {
-            Obstaculo asteroide = new Obstaculo("Asteroide", 20, pos[0], pos[1]);
-            asteroide.setFilas(filas);
-            nivel.agregarObstaculo(asteroide);
-            nivel.agregarElementoDinamico(asteroide);
+        for (int i = 0; i < asteroides.length; i++) {
+            String direccion = (i % 2 == 0) ? "ABAJO" : "ARRIBA";
+            lineas.add("ASTEROIDE,Asteroide,20," + asteroides[i][0] + "," + asteroides[i][1] + "," + direccion);
         }
 
-        nivel.agregarCheckPoint(new CheckPoint("Estacion", 6, 5));
+        // Satélites
+        lineas.add("SATELITE,Satelite 1,Repara 25 de vida,2,1");
+        lineas.add("SATELITE,Satelite 2,Repara 25 de vida,12,6");
 
-        Utileria satelite1 = new Utileria("Satelite 1", "Repara 25 de vida", 2, 1);
-        Utileria satelite2 = new Utileria("Satelite 2", "Repara 25 de vida", 12, 6);
-        satelite1.setTablero(columnas, filas);
-        satelite2.setTablero(columnas, filas);
-        nivel.agregarElementoDinamico(satelite1);
-        nivel.agregarElementoDinamico(satelite2);
-
-        itemsEnMapa.add(new ItemEnMapa(new Arma("Laser", 50, 5), 2, 5));
+        // Objetos para recoger
+        lineas.add("ARMA_MAPA,Laser,50,5.0,2,5");
         int[][] cristales = {
                 {4, 2}, {6, 6}, {7, 5}, {8, 9}, {9, 4}, {10, 2}, {11, 7}, {12, 5}
         };
         for (int[] pos : cristales) {
-            itemsEnMapa.add(new ItemEnMapa(new Recompensa("Cristal", 10, "Cristal"), pos[0], pos[1]));
+            lineas.add("RECOMPENSA_MAPA,Cristal,10,Cristal," + pos[0] + "," + pos[1]);
         }
-
-        nivel.mostrarEstado();
+        return lineas;
     }
+
+    //Acciones del jugador
 
     public void moverNave(String direccion) {
         if (juegoTerminado) {

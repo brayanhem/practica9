@@ -27,9 +27,9 @@ public class Main extends Application {
     private double celda = 56;         // tamaño de cada casilla en píxeles
     private int msPorTick = 700;       // cada cuánto avanzan asteroides y satélites una casilla
     private int msAnimacion = 600;     // duración del deslizamiento
+    private String archivoConfiguracion = "configuracion.txt"; // aquí se lee y se guarda la partida
 
     private Juego juego;
-
 
     private Pane capaDinamica;
     private Map<Object, Node> spritesActivos = new HashMap<>();
@@ -49,7 +49,7 @@ public class Main extends Application {
 
     @Override
     public void start(Stage stage) {
-        juego = new Juego();
+        juego = new Juego(archivoConfiguracion); // lee el archivo (si no existe, lo crea)
 
         imgAsteroide = new Image("file:src/main/resources/asteroide.png");
         imgNave = new Image("file:src/main/resources/nave.png");
@@ -73,7 +73,7 @@ public class Main extends Application {
         lblMensaje.setMinHeight(36);
         lblMensaje.setMaxWidth(juego.getColumnas() * celda);
 
-        Label lblAyuda = crearEtiqueta("Flechas/WASD: mover   |   ESPACIO: disparar láser (hacia la derecha)");
+        Label lblAyuda = crearEtiqueta("Flechas/WASD: mover  |  ESPACIO: disparar  |  G: guardar  |  L: cargar");
 
         Button btnReiniciar = new Button("Reiniciar");
         btnReiniciar.setFocusTraversable(false); // para que ESPACIO no presione el botón
@@ -83,8 +83,16 @@ public class Main extends Application {
             refrescar();
         });
 
+        Button btnGuardar = new Button("Guardar");
+        btnGuardar.setFocusTraversable(false);
+        btnGuardar.setOnAction(e -> guardarPartida());
+
+        Button btnCargar = new Button("Cargar");
+        btnCargar.setFocusTraversable(false);
+        btnCargar.setOnAction(e -> cargarPartida());
+
         HBox filaInfo = new HBox(30, lblVida, lblCheckPoint, lblInventario);
-        HBox filaAyuda = new HBox(15, btnReiniciar, lblAyuda);
+        HBox filaAyuda = new HBox(10, btnGuardar, btnCargar, btnReiniciar, lblAyuda);
 
         VBox raiz = new VBox(8, filaInfo, capaDinamica, lblMensaje, filaAyuda);
         raiz.setPadding(new Insets(15));
@@ -134,9 +142,28 @@ public class Main extends Application {
             case SPACE:
                 juego.disparar();
                 break;
+            case G:
+                guardarPartida();
+                return;
+            case L:
+                cargarPartida();
+                return;
             default:
                 return;
         }
+        refrescar();
+    }
+
+    // ---------- Guardar y cargar la partida ----------
+
+    private void guardarPartida() {
+        juego.guardarPartida(archivoConfiguracion);
+        refrescar();
+    }
+
+    private void cargarPartida() {
+        juego = new Juego(archivoConfiguracion); // vuelve a leer el archivo
+        crearSprites();                          // crea de nuevo las imágenes con los objetos leídos
         refrescar();
     }
 
