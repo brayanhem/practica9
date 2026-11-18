@@ -44,6 +44,17 @@ public class Personaje implements Destruible,ElementoDinamico {
         this.posicionY = y;
     }
 
+    // Se usa al cargar una partida guardada (la vida puede ser menor al máximo)
+    public void setVida(int vida){
+        this.vida = vida;
+        if(this.vida > vidaMaxima){
+            this.vida = vidaMaxima;
+        }
+        if(this.vida < 0){
+            this.vida = 0;
+        }
+    }
+
     public void recibirDaño(int daño){
         vida = vida - daño;
         if(vida <= 0){
